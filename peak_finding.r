@@ -39,23 +39,33 @@ for (i in directories[1]){ #it's a bit slow, the 1 here and on line 14 are for t
 x <- ecg_frame$t
 sample_rate <- 500
 
-peaks<-
+peaks <-	# This code identifies the R-wave peak
   data.frame(
-    pracma::findpeaks(ecg_frame$v3[1:nrow(ecg_frame)], 
+    pracma::findpeaks(ecg_frame$v3[1:nrow(ecg_frame)],  # nolint: seq_linter. # nolint
                       minpeakdistance = .4*sample_rate,
                       minpeakheight=mean(ecg_frame$v3[1:nrow(ecg_frame)])+1.85*sd(ecg_frame$v3[1:nrow(ecg_frame)])
+	)
+  )
+
+noise_level	<-	# This code identifies a baseline noise level, to subsequently generate a signal:noise value
+  data.frame(
+    pracma::findpeaks(ecg_frame$v3[1:nrow(ecg_frame)],  # nolint: seq_linter. # nolint
+                      minpeakdistance = .4*sample_rate,
+                      minpeakheight=mean(ecg_frame$v3[1:nrow(ecg_frame)])+1*sd(ecg_frame$v3[1:nrow(ecg_frame)])					
     )
   )
 
 head(peaks)
 
 peaks_s <- peaks * 0.002
+noise_level_s <- noise_level * 0.002
 
 # Plots peaks against ECG signal
 
 ggplot(ecg_frame, aes(x = t))+
 	geom_line(aes(y = v3, color = "Denoised Signal")) +
     geom_vline(xintercept = peaks_s$X2,linetype = 2) +
+	geom_vline(xintercept = noise_level_s$X2,linetype = 3) +
 	scale_color_manual(values = c("Denoised Signal" = "blue", "R intercept" = "black")) +
 	theme_minimal()
 
@@ -77,3 +87,9 @@ RR_diff <- RR_ms_offset1 - RR_ms_trim
 RR_diff_squ <- RR_diff^2
 RR_diff_squ_avg <- mean(RR_diff_squ)
 RMSSD <- sqrt(RR_diff_squ_avg)
+
+# Generate signal:noise value to use as an exclusion threshold - set cutoff at >0.2?
+
+SNR_diff <- nrow(noise_level) - nrow(peaks)
+SNR <- SNR_diff / nrow(peaks)
+SNR
