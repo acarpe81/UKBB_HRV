@@ -39,7 +39,7 @@ for (i in directories[1]){ #it's a bit slow, the 1 here and on line 14 are for t
 		squared_signal=diff_signal^2	#Squaring the signal to emphasise larger differences
 		
 		#	Creating a moving window integrator, effectively operating as an averaging filter
-		window_width <- round(0.150 * sample_rate)  # 150 ms window width
+		window_width <- round(0.08 * sample_rate)  # 80 ms window width							## Original value: 150 ms
 		integrated_signal <- filter(rep(1/window_width, window_width), 1, squared_signal)
 
 		#	Adaptive thresholding: # initialize thresholds based on the integrated signal

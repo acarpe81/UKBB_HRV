@@ -39,7 +39,7 @@ for (i in directories[1]){ #it's a bit slow, the 1 here and on line 14 are for t
 		squared_signal=diff_signal^2	#Squaring the signal to emphasise larger differences
 		
 		#	Creating a moving window integrator, effectively operating as an averaging filter
-		window_width <- round(0.08 * sample_rate)  # 80 ms window width							## Original value: 150 ms
+		window_width <- round(0.15 * sample_rate)  # 150 ms window width
 		integrated_signal <- filter(rep(1/window_width, window_width), 1, squared_signal)
 
 		#	Adaptive thresholding: # initialize thresholds based on the integrated signal
@@ -56,33 +56,58 @@ for (i in directories[1]){ #it's a bit slow, the 1 here and on line 14 are for t
 
 		# Loop through the integrated signal to detect peaks. The thresholds are adaptively updated based on the signal and noise levels.
 		for (i in 2:(length(integrated_signal) - 1)) {
-		if (integrated_signal[i] > thr_sig && integrated_signal[i] > integrated_signal[i-1] && integrated_signal[i] > integrated_signal[i+1]) {
-			r_peaks <- c(r_peaks, i)
+			if (integrated_signal[i] > thr_sig && integrated_signal[i] > integrated_signal[i-1] && integrated_signal[i] > integrated_signal[i+1]) {
+				r_peaks <- c(r_peaks, i)
 
 		# Update signal level and thr_sig based on the newly detected R-peak
-		signal_level <- 0.875 * signal_level + 0.125 * integrated_signal[i]
-		thr_sig <- noise_level + 0.25 * (signal_level - noise_level)
-	} else if (integrated_signal[i] > thr_noise && integrated_signal[i] > integrated_signal[i-1] && integrated_signal[i] > integrated_signal[i+1]) {
-		noise_peaks <- c(noise_peaks, i)
-		
+			signal_level <- 0.875 * signal_level + 0.125 * integrated_signal[i]
+			thr_sig <- noise_level + 0.25 * (signal_level - noise_level)
+		} else if (integrated_signal[i] > thr_noise && integrated_signal[i] > integrated_signal[i-1] && integrated_signal[i] > integrated_signal[i+1]) {
+			noise_peaks <- c(noise_peaks, i)
+			
 		# Update noise level and thr_noise based on the newly detected noise peak
-		noise_level <- 0.875 * noise_level + 0.125 * integrated_signal[i]
-		thr_noise <- noise_level + 0.25 * (signal_level - noise_level)
-		}
-		}
+			noise_level <- 0.875 * noise_level + 0.125 * integrated_signal[i]
+			thr_noise <- noise_level + 0.25 * (signal_level - noise_level)
+			}
+			}
 		
 		# Post-processing: Remove peaks that are too close together
-		min_peak_distance <- round(0.5 * sample_rate)  # Minimum RR 500 ms (120 bpm: to account for instantaneous HRV) 
+		min_peak_distance <- round(0.4 * sample_rate)  # Minimum RR 400 ms (150 bpm: to account for instantaneous HRV) 
 													   
 		# Initialize filtered peaks list with the first peak
 		filtered_peak_indices <- r_peaks[1]
 		for(i in 2:length(r_peaks)) {
-		if(r_peaks[i] - filtered_peak_indices[length(filtered_peak_indices)] >= min_peak_distance) {
-			filtered_peak_indices <- c(filtered_peak_indices, r_peaks[i])
+			if(r_peaks[i] - filtered_peak_indices[length(filtered_peak_indices)] >= min_peak_distance) {
+				filtered_peak_indices <- c(filtered_peak_indices, r_peaks[i])
+					}
 				}
-			}
+
 
 		peaks_s <- filtered_peak_indices * 0.002	# Converts to seconds	
+
+		# Filtering R-peaks excluding those leading to short RR intervals
+
+		# Calculate RR intervals
+		filtered_peak_indices_s <- filtered_peak_indices / 500 # Convert indices to seconds
+		rr_intervals <- diff(filtered_peak_indices_s)
+
+		# Calculate the mean RR interval (could also set a predefined expected minimum RR interval)
+		mean_rr <- mean(rr_intervals)
+
+		# Instead of using standard deviation, define an explicit threshold for "short" RR intervals
+		# For instance, any RR interval less than 80% of the mean RR might be considered short
+		short_rr_threshold <- 0.8 * mean_rr
+
+		# Identify short RR intervals that are likely due to premature ectopic beats
+		short_rr_indices <- which(rr_intervals < short_rr_threshold)
+
+		# Flag the R-peaks leading to short RR intervals for exclusion
+		# Note: Adding 1 to the indices because diff() reduces the length by 1
+		ectopic_r_peaks <- filtered_peak_indices_s[short_rr_indices + 1]
+
+		# Remove the ectopic R-peaks from the original list of R-peaks
+		r_peaks_filtered <- filtered_peak_indices_s[!filtered_peak_indices_s %in% ectopic_r_peaks]
+
 	}
 }
 
@@ -90,9 +115,10 @@ for (i in directories[1]){ #it's a bit slow, the 1 here and on line 14 are for t
 
 ggplot(ecg_frame, aes(x = t))+
 	geom_line(aes(y = v3, color = "Denoised Signal")) +
-    geom_vline(xintercept = peaks_s,linetype = 2) +
+    geom_vline(xintercept = r_peaks_filtered,linetype = 2) +
 	scale_color_manual(values = c("Denoised Signal" = "blue", "R intercept" = "black")) +
 	theme_minimal()
+
 
 # Creates an ordered list of R wave timings and calculates RR intervals and converts them to ms
 
