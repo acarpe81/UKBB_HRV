@@ -46,43 +46,21 @@ for (i in directories[1]){ #it's a bit slow, the 1 here and on line 14 are for t
 		thr_sig <- 0.2 * max(integrated_signal)
 		thr_noise <- 0.5 * thr_sig
 
-		# Initialize lists to keep track of detected R-peaks and noise peaks
-		r_peaks <- c()
-		noise_peaks <- c()
+		peak_indices <- which(diff(sign(diff(integrated_signal))) == -2 & integrated_signal[-c(1, length(integrated_signal))] > thr_sig)
 
-		# Initialize signal and noise levels
-		signal_level <- thr_sig
-		noise_level <- thr_noise
+		# Post-processing: filter out peaks that are too close together
+		min_peak_distance <- round(0.5 * sample_rate)  # Minimum RR 500 ms (120 bpm) distance at a 500 Hz sampling rate
 
-		# Loop through the integrated signal to detect peaks. The thresholds are adaptively updated based on the signal and noise levels.
-		for (i in 2:(length(integrated_signal) - 1)) {
-		if (integrated_signal[i] > thr_sig && integrated_signal[i] > integrated_signal[i-1] && integrated_signal[i] > integrated_signal[i+1]) {
-			r_peaks <- c(r_peaks, i)
-
-		# Update signal level and thr_sig based on the newly detected R-peak
-		signal_level <- 0.875 * signal_level + 0.125 * integrated_signal[i]
-		thr_sig <- noise_level + 0.25 * (signal_level - noise_level)
-	} else if (integrated_signal[i] > thr_noise && integrated_signal[i] > integrated_signal[i-1] && integrated_signal[i] > integrated_signal[i+1]) {
-		noise_peaks <- c(noise_peaks, i)
-		
-		# Update noise level and thr_noise based on the newly detected noise peak
-		noise_level <- 0.875 * noise_level + 0.125 * integrated_signal[i]
-		thr_noise <- noise_level + 0.25 * (signal_level - noise_level)
-		}
-		}
-		
-		# Post-processing: Remove peaks that are too close together
-		min_peak_distance <- round(0.5 * sample_rate)  # Minimum RR 500 ms (120 bpm: to account for instantaneous HRV) 
-													   
 		# Initialize filtered peaks list with the first peak
-		filtered_peak_indices <- r_peaks[1]
-		for(i in 2:length(r_peaks)) {
-		if(r_peaks[i] - filtered_peak_indices[length(filtered_peak_indices)] >= min_peak_distance) {
-			filtered_peak_indices <- c(filtered_peak_indices, r_peaks[i])
+		filtered_peak_indices <- peak_indices[1]
+		for(i in 2:length(peak_indices)) {
+		if(peak_indices[i] - filtered_peak_indices[length(filtered_peak_indices)] >= min_peak_distance) {
+			filtered_peak_indices <- c(filtered_peak_indices, peak_indices[i])
 				}
 			}
 
-		peaks_s <- filtered_peak_indices * 0.002	# Converts to seconds	
+		peaks_s <- filtered_peak_indices * 0.002	# Converts to seconds
+
 	}
 }
 
@@ -113,15 +91,3 @@ RR_diff_squ <- RR_diff^2
 RR_diff_squ_avg <- mean(RR_diff_squ)
 RMSSD <- sqrt(RR_diff_squ_avg)
 RMSSD
-
-## Further goals: 
-	# 1. Generate a table of all the RMSSD values for each ECG file which iterates through all the files in the directory
-	# 2. Include RMSSD, mean RR interval, heart rate in the table and exclude HR >100 or <50
-	# 3. Generate a histogram of RMSSD values
-	# 4. Generate a histogram of mean RR intervals
-	# 5. Generate a histogram of heart rates
-	# 6. Generate a histogram of the number of R peaks detected
-	# 7. Include info on the file and directory in the table
-	# 8. Include some patient identifiable label to allow UKBB to link back to the patient
-	# 9. Include a marker for the presence of atrial fibrillation
-	# 10. Include some measure of signal quality
