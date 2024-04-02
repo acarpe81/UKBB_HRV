@@ -1,4 +1,5 @@
-# This is sample code for running analysis on a cardiac ECG in the UK Biobank in R You need to run the first two lines separately
+## 
+
 install.packages("XML")
 install.packages("signal")
 install.packages("pracma")

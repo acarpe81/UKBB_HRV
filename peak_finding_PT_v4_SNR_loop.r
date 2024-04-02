@@ -1,4 +1,5 @@
-# This is sample code for running analysis on a cardiac ECG in the UK Biobank in R You need to run the first two lines separately
+##
+
 install.packages("XML")
 install.packages("signal")
 install.packages("pracma")
@@ -14,7 +15,8 @@ results_df <- data.frame(filepath = character(),
 							RMSSD = numeric(),
 							signal_power = numeric(),
 							noise_power = numeric(),
-							snr_db = numeric())
+							snr_db = numeric(),
+							snr_db_int = numeric())
 
 directories=system('ls ../../mnt/project/Bulk/Electrocardiogram/Resting', intern = TRUE)%>%as.numeric()
 for (i in directories[1]){ #it's a bit slow, the 1 here and on line 14 are for testing
@@ -64,18 +66,18 @@ for (i in directories[1]){ #it's a bit slow, the 1 here and on line 14 are for t
 		noise_level <- thr_noise
 
 		# Loop through the integrated signal to detect peaks. The thresholds are adaptively updated based on the signal and noise levels.
-		for (i in 2:(length(integrated_signal) - 1)) {
-			if (integrated_signal[i] > thr_sig && integrated_signal[i] > integrated_signal[i-1] && integrated_signal[i] > integrated_signal[i+1]) {
-				r_peaks <- c(r_peaks, i)
+		for (k in 2:(length(integrated_signal) - 1)) {
+			if (integrated_signal[k] > thr_sig && integrated_signal[k] > integrated_signal[k-1] && integrated_signal[k] > integrated_signal[k+1]) {
+				r_peaks <- c(r_peaks, k)
 
 		# Update signal level and thr_sig based on the newly detected R-peak
-			signal_level <- 0.875 * signal_level + 0.125 * integrated_signal[i]
+			signal_level <- 0.875 * signal_level + 0.125 * integrated_signal[k]
 			thr_sig <- noise_level + 0.25 * (signal_level - noise_level)
-		} else if (integrated_signal[i] > thr_noise && integrated_signal[i] > integrated_signal[i-1] && integrated_signal[i] > integrated_signal[i+1]) {
-			noise_peaks <- c(noise_peaks, i)
+		} else if (integrated_signal[k] > thr_noise && integrated_signal[k] > integrated_signal[k-1] && integrated_signal[k] > integrated_signal[k+1]) {
+			noise_peaks <- c(noise_peaks, k)
 			
 		# Update noise level and thr_noise based on the newly detected noise peak
-			noise_level <- 0.875 * noise_level + 0.125 * integrated_signal[i]
+			noise_level <- 0.875 * noise_level + 0.125 * integrated_signal[k]
 			thr_noise <- noise_level + 0.25 * (signal_level - noise_level)
 			}
 			}
@@ -85,11 +87,13 @@ for (i in directories[1]){ #it's a bit slow, the 1 here and on line 14 are for t
 													   
 		# Initialize filtered peaks list with the first peak
 		filtered_peak_indices <- r_peaks[1]
-		for(i in 2:length(r_peaks)) {
-			if(r_peaks[i] - filtered_peak_indices[length(filtered_peak_indices)] >= min_peak_distance) {
-				filtered_peak_indices <- c(filtered_peak_indices, r_peaks[i])
-					}
+		for(l in 2:length(r_peaks)) {
+			if(!is.na(r_peaks[l]s) & !is.na(filtered_peak_indices[length(filtered_peak_indices)])) {
+				if(r_peaks[l] - filtered_peak_indices[length(filtered_peak_indices)] >= min_peak_distance) {
+				filtered_peak_indices <- c(filtered_peak_indices, r_peaks[l])
 				}
+			}
+			}
 
 		peaks_s <- filtered_peak_indices * 0.002	# Converts to seconds	
 
@@ -141,17 +145,24 @@ for (i in directories[1]){ #it's a bit slow, the 1 here and on line 14 are for t
 	# Calculate signal power
 
 	signal_power <- mean(signal[r_peaks_filtered]^2)
+	
+	signal_power_int <- mean(integrated_signal[r_peaks_filtered]^2)
 
 	#Calculate noise power based on specific noise peaks 
 
 	noise_indices <- setdiff(1:length(signal), r_peaks_filtered)  # All indices excluding R-peaks
 	noise_power <- mean(signal[noise_indices]^2)
 
+	noise_indices_int <- setdiff(1:length(integrated_signal), r_peaks_filtered)
+	noise_power_int <- mean(integrated_signal[noise_indices_int]^2)
+
 	# Compute SNR in decibels (dB)
 	snr_db <- 10 * log10(signal_power / noise_power)
+	snr_db_int <- 10 * log10(signal_power_int / noise_power_int)
 
 	# Print SNR
 	print(paste("SNR:", snr_db, "dB"))
+	print(paste("Integrated SNR:", snr_db_int, "dB"))
 
 # Add a row to the results dataframe
 results_df <- rbind(results_df, data.frame(filepath = filepath,
@@ -160,7 +171,8 @@ results_df <- rbind(results_df, data.frame(filepath = filepath,
 											RMSSD = RMSSD,
 											signal_power = signal_power,
 											noise_power = noise_power,
-											snr_db = snr_db))
+											snr_db = snr_db,
+											snr_db_int = snr_db_int))
 	  }
 	}
 
