@@ -7,6 +7,15 @@ library('XML')
 library('ggplot2')
 library('signal')
 
+# Initialize an empty dataframe to store the results
+results_df <- data.frame(filepath = character(),
+							j = character(),
+							mean_rr = numeric(),
+							RMSSD = numeric(),
+							signal_power = numeric(),
+							noise_power = numeric(),
+							snr_db = numeric())
+
 directories=system('ls ../../mnt/project/Bulk/Electrocardiogram/Resting', intern = TRUE)%>%as.numeric()
 for (i in directories[1]){ #it's a bit slow, the 1 here and on line 14 are for testing
 	path=paste0('../../mnt/project/Bulk/Electrocardiogram/Resting/',i)
@@ -82,7 +91,6 @@ for (i in directories[1]){ #it's a bit slow, the 1 here and on line 14 are for t
 					}
 				}
 
-
 		peaks_s <- filtered_peak_indices * 0.002	# Converts to seconds	
 
 		# Filtering R-peaks excluding those leading to short RR intervals
@@ -107,18 +115,6 @@ for (i in directories[1]){ #it's a bit slow, the 1 here and on line 14 are for t
 
 		# Remove the ectopic R-peaks from the original list of R-peaks
 		r_peaks_filtered <- filtered_peak_indices_s[!filtered_peak_indices_s %in% ectopic_r_peaks]
-
-	}
-}
-
-# Plots peaks against ECG signal
-
-ggplot(ecg_frame, aes(x = t))+
-	geom_line(aes(y = v3, color = "Denoised Signal")) +
-    geom_vline(xintercept = r_peaks_filtered,linetype = 2) +
-	scale_color_manual(values = c("Denoised Signal" = "blue", "R intercept" = "black")) +
-	theme_minimal()
-
 
 # Creates an ordered list of R wave timings and calculates RR intervals and converts them to ms
 
@@ -156,6 +152,29 @@ ggplot(ecg_frame, aes(x = t))+
 
 	# Print SNR
 	print(paste("SNR:", snr_db, "dB"))
+
+# Add a row to the results dataframe
+results_df <- rbind(results_df, data.frame(filepath = filepath,
+											j = j,
+											mean_rr = mean_rr,
+											RMSSD = RMSSD,
+											signal_power = signal_power,
+											noise_power = noise_power,
+											snr_db = snr_db))
+	  }
+	}
+
+# Print the results dataframe
+results_df
+
+# Plots peaks against ECG signal
+
+ggplot(ecg_frame, aes(x = t))+
+	geom_line(aes(y = v3, color = "Denoised Signal")) +
+    geom_vline(xintercept = r_peaks_filtered,linetype = 2) +
+	scale_color_manual(values = c("Denoised Signal" = "blue", "R intercept" = "black")) +
+	theme_minimal()
+
 
 ## Further goals: 
 	# 1. Generate a table of all the RMSSD values for each ECG file which iterates through all the files in the directory
