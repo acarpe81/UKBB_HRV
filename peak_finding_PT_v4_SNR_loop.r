@@ -8,8 +8,11 @@ library('XML')
 library('ggplot2')
 library('signal')
 
+options(expressions = 500000)
+
 # Initialize an empty dataframe to store the results
 results_df <- data.frame(filepath = character(),
+							eid = numeric(),
 							j = character(),
 							mean_rr = numeric(),
 							RMSSD = numeric(),
@@ -88,7 +91,7 @@ for (i in directories[1]){ #it's a bit slow, the 1 here and on line 14 are for t
 		# Initialize filtered peaks list with the first peak
 		filtered_peak_indices <- r_peaks[1]
 		for(l in 2:length(r_peaks)) {
-			if(!is.na(r_peaks[l]s) & !is.na(filtered_peak_indices[length(filtered_peak_indices)])) {
+			if(!is.na(r_peaks[l]) & !is.na(filtered_peak_indices[length(filtered_peak_indices)])) {
 				if(r_peaks[l] - filtered_peak_indices[length(filtered_peak_indices)] >= min_peak_distance) {
 				filtered_peak_indices <- c(filtered_peak_indices, r_peaks[l])
 				}
@@ -120,60 +123,62 @@ for (i in directories[1]){ #it's a bit slow, the 1 here and on line 14 are for t
 		# Remove the ectopic R-peaks from the original list of R-peaks
 		r_peaks_filtered <- filtered_peak_indices_s[!filtered_peak_indices_s %in% ectopic_r_peaks]
 
-# Creates an ordered list of R wave timings and calculates RR intervals and converts them to ms
+		# Creates an ordered list of R wave timings and calculates RR intervals and converts them to ms
+		RR_times <- peaks_s
+		RR_order <- RR_times[order(RR_times)]
+		RR_times_plus1 <- RR_order[2:length(RR_order)]
+		RR_order_trim <- head(RR_order,-1)
+		RR_int <- RR_times_plus1 - RR_order_trim
+		RR_ms <- RR_int * 1000
 
-	RR_times <- peaks_s
-	RR_order <- RR_times[order(RR_times)]
-	RR_times_plus1 <- RR_order[2:length(RR_order)]
-	RR_order_trim <- head(RR_order,-1)
-	RR_int <- RR_times_plus1 - RR_order_trim
-	RR_ms <- RR_int * 1000
+		# Starting to calculate the RMSSD - calculates differences between RR intervals, squares and averages them
+		RR_ms_offset1 <- RR_ms[2:length(RR_ms)]
+		RR_ms_trim <- head(RR_ms,-1)
+		RR_diff <- RR_ms_offset1 - RR_ms_trim
 
-# Starting to calculate the RMSSD - calculates differences between RR intervals, squares and averages them
+		RR_diff_squ <- RR_diff^2
+		RR_diff_squ_avg <- mean(RR_diff_squ)
+		RMSSD <- sqrt(RR_diff_squ_avg)
+		RMSSD
 
-	RR_ms_offset1 <- RR_ms[2:length(RR_ms)]
-	RR_ms_trim <- head(RR_ms,-1)
-	RR_diff <- RR_ms_offset1 - RR_ms_trim
+		# Calculate the signal-to-noise ratio
 
-	RR_diff_squ <- RR_diff^2
-	RR_diff_squ_avg <- mean(RR_diff_squ)
-	RMSSD <- sqrt(RR_diff_squ_avg)
-	RMSSD
+		# Calculate signal power
+		signal_power <- mean(signal[r_peaks_filtered]^2)
+		
+		signal_power_int <- mean(integrated_signal[r_peaks_filtered]^2)
 
-# Calculate the signal-to-noise ratio
+		#Calculate noise power based on specific noise peaks 
+		noise_indices <- setdiff(1:length(signal), r_peaks_filtered)  # All indices excluding R-peaks
+		noise_power <- mean(signal[noise_indices]^2)
 
-	# Calculate signal power
+		noise_indices_int <- setdiff(1:length(integrated_signal), r_peaks_filtered)
+		noise_power_int <- mean(integrated_signal[noise_indices_int]^2)
 
-	signal_power <- mean(signal[r_peaks_filtered]^2)
-	
-	signal_power_int <- mean(integrated_signal[r_peaks_filtered]^2)
+		# Compute SNR in decibels (dB)
+		snr_db <- 10 * log10(signal_power / noise_power)
+		snr_db_int <- 10 * log10(signal_power_int / noise_power_int)
 
-	#Calculate noise power based on specific noise peaks 
+		# Print SNR
+		print(paste("SNR:", snr_db, "dB"))
+		print(paste("Integrated SNR:", snr_db_int, "dB"))
 
-	noise_indices <- setdiff(1:length(signal), r_peaks_filtered)  # All indices excluding R-peaks
-	noise_power <- mean(signal[noise_indices]^2)
-
-	noise_indices_int <- setdiff(1:length(integrated_signal), r_peaks_filtered)
-	noise_power_int <- mean(integrated_signal[noise_indices_int]^2)
-
-	# Compute SNR in decibels (dB)
-	snr_db <- 10 * log10(signal_power / noise_power)
-	snr_db_int <- 10 * log10(signal_power_int / noise_power_int)
-
-	# Print SNR
-	print(paste("SNR:", snr_db, "dB"))
-	print(paste("Integrated SNR:", snr_db_int, "dB"))
-
-# Add a row to the results dataframe
-results_df <- rbind(results_df, data.frame(filepath = filepath,
-											j = j,
-											mean_rr = mean_rr,
-											RMSSD = RMSSD,
-											signal_power = signal_power,
-											noise_power = noise_power,
-											snr_db = snr_db,
-											snr_db_int = snr_db_int))
+		# Add a row to the results dataframe
+		results_df <- rbind(results_df, data.frame(filepath = filepath,
+												eid = sub("_.*", "", j),
+												j = j,
+												mean_rr = mean_rr,
+												RMSSD = RMSSD,
+												signal_power = signal_power,
+												noise_power = noise_power,
+												snr_db = snr_db,
+												snr_db_int = snr_db_int))
 	  }
+
+	# Save the results dataframe to a CSV file and upload to DNAnexus
+	write.csv(results_df, "hrv.csv", row.names = FALSE)
+	system('dx upload hrv.csv --path /Alexander/')
+
 	}
 
 # Print the results dataframe
@@ -189,13 +194,13 @@ ggplot(ecg_frame, aes(x = t))+
 
 
 ## Further goals: 
-	# 1. Generate a table of all the RMSSD values for each ECG file which iterates through all the files in the directory
-	# 2. Include RMSSD, mean RR interval, heart rate in the table and exclude HR >100 or <50
+	# 1. Generate a table of all the RMSSD values for each ECG file which iterates through all the files in the directory - Done
+	# 2. Include RMSSD, mean RR interval, heart rate in the table and exclude HR >100 or <50 - Done (other than exclusion)
 	# 3. Generate a histogram of RMSSD values
 	# 4. Generate a histogram of mean RR intervals
 	# 5. Generate a histogram of heart rates
 	# 6. Generate a histogram of the number of R peaks detected
-	# 7. Include info on the file and directory in the table
-	# 8. Include some patient identifiable label to allow UKBB to link back to the patient
+	# 7. Include info on the file and directory in the table - Done
+	# 8. Include some patient identifiable label to allow UKBB to link back to the patient - Done
 	# 9. Include a marker for the presence of atrial fibrillation
-	# 10. Include some measure of signal quality
+	# 10. Include some measure of signal quality - Done
