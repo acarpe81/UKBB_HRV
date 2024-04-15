@@ -5,15 +5,12 @@ source_url("https://raw.githubusercontent.com/hdg204/Rdna-nexus/main/install.R")
     system2("dx", args = c("download", "/Alexander/noltegrstxt2.txt"))
     system2("dx", args = c("download", "/Alexander/hrv_11_04_24.csv"))
 
-# Read the GRS and HRV files as dataframes
-    noltegrs_df <- read.table("noltegrstxt2.txt", header = TRUE)
+# Read the HRV file as a dataframe
+
     hrv_df <- read.csv("hrv_11_04_24.csv")
 
-# Generate GRS using eid from hrv_df as input
-    a <- generate_grs(hrv_df)
-    #grs_list <- list(grs1 = a$grs, grs2 = a$grs)
-    #hrv_df$grs1 <- a$grs
-    #hrv_df$grs2 <- a$grs
+# Generate GRS 
+    a <- generate_grs('noltegrstxt2.txt')
 
-# Print the updated dataframe
-    hrv_df
+
+# Need to convert the GRS SNPs from hg19 to hg38 using a liftover tool
