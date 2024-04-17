@@ -1,4 +1,5 @@
-##
+## Peak finds for R waves and calculates RMSSD and SNR. Outputs all to a CSV file and uploads to DNAnexus.
+## Author: Alexander Carpenter
 
 install.packages("XML")
 install.packages("signal")
