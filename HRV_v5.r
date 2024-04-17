@@ -47,30 +47,30 @@ for (i in directories[1]){ #it's a bit slow, the 1 here and on line 14 are for t
 		v_2 <- filter(butterworth_filter_2, signal)
 		v_3 <- filter(butterworth_filter, v_2)
 		ecg_frame=data.frame(t=1:5000/500,v=signal,v2=v_2,v3=v_3)
-		# the nonlinear energy operator is a useful way to characterise the 'energy' of a signal, i.e. the time the most stuff is happening
-		nleo=(abs((ecg_frame$v3[2:(nrow(ecg_frame)-1)])^2)-(((ecg_frame$v3[1:(nrow(ecg_frame)-2)])^2)*((ecg_frame$v3[3:(nrow(ecg_frame))])^2)))
-		ecg_frame$energy=c(NA,nleo,NA)
+		# NLEO calculation
+			nleo=(abs((ecg_frame$v3[2:(nrow(ecg_frame)-1)])^2)-(((ecg_frame$v3[1:(nrow(ecg_frame)-2)])^2)*((ecg_frame$v3[3:(nrow(ecg_frame))])^2)))
+			ecg_frame$energy=c(NA,nleo,NA)
 
-		#	Start of Pan-Tompkins algorithm
-		diff_signal=diff(ecg_frame$v3)	#Differentiating the signal to highlight the R wave upslope
-	
-		squared_signal=diff_signal^2	#Squaring the signal to emphasise larger differences
+		# Start of Pan-Tompkins algorithm
+			diff_signal=diff(ecg_frame$v3)	#Differentiating the signal to highlight the R wave upslope
 		
-		#	Creating a moving window integrator, effectively operating as an averaging filter
-		window_width <- round(0.15 * sample_rate)  # 150 ms window width
-		integrated_signal <- filter(rep(1/window_width, window_width), 1, squared_signal)
+			squared_signal=diff_signal^2	#Squaring the signal to emphasise larger differences
+		
+		# Creating a moving window integrator, effectively operating as an averaging filter
+			window_width <- round(0.15 * sample_rate)  # 150 ms window width
+			integrated_signal <- filter(rep(1/window_width, window_width), 1, squared_signal)
 
-		#	Adaptive thresholding: # initialize thresholds based on the integrated signal
-		thr_sig <- 0.2 * max(integrated_signal)
-		thr_noise <- 0.5 * thr_sig
+		# Adaptive thresholding: # initialize thresholds based on the integrated signal
+			thr_sig <- 0.2 * max(integrated_signal)
+			thr_noise <- 0.5 * thr_sig
 
 		# Initialize lists to keep track of detected R-peaks and noise peaks
-		r_peaks <- c()
-		noise_peaks <- c()
+			r_peaks <- c()
+			noise_peaks <- c()
 
 		# Initialize signal and noise levels
-		signal_level <- thr_sig
-		noise_level <- thr_noise
+			signal_level <- thr_sig
+			noise_level <- thr_noise
 
 		# Loop through the integrated signal to detect peaks. The thresholds are adaptively updated based on the signal and noise levels.
 		for (k in 2:(length(integrated_signal) - 1)) {
@@ -90,82 +90,82 @@ for (i in directories[1]){ #it's a bit slow, the 1 here and on line 14 are for t
 			}
 		
 		# Post-processing: Remove peaks that are too close together
-		min_peak_distance <- round(0.4 * sample_rate)  # Minimum RR 400 ms (150 bpm: to account for instantaneous HRV) 
+			min_peak_distance <- round(0.4 * sample_rate)  # Minimum RR 400 ms (150 bpm: to account for instantaneous HRV) 
 													   
 		# Initialize filtered peaks list with the first peak
-		filtered_peak_indices <- r_peaks[1]
-		for(l in 2:length(r_peaks)) {
-			if(!is.na(r_peaks[l]) & !is.na(filtered_peak_indices[length(filtered_peak_indices)])) {
-				if(r_peaks[l] - filtered_peak_indices[length(filtered_peak_indices)] >= min_peak_distance) {
-				filtered_peak_indices <- c(filtered_peak_indices, r_peaks[l])
+			filtered_peak_indices <- r_peaks[1]
+			for(l in 2:length(r_peaks)) {
+				if(!is.na(r_peaks[l]) & !is.na(filtered_peak_indices[length(filtered_peak_indices)])) {
+					if(r_peaks[l] - filtered_peak_indices[length(filtered_peak_indices)] >= min_peak_distance) {
+					filtered_peak_indices <- c(filtered_peak_indices, r_peaks[l])
+					}
 				}
-			}
-			}
+				}
 
-		peaks_s <- filtered_peak_indices * 0.002	# Converts to seconds	
+			peaks_s <- filtered_peak_indices * 0.002	# Converts to seconds	
 
 		# Filtering R-peaks excluding those leading to short RR intervals
 
 		# Calculate RR intervals
-		filtered_peak_indices_s <- filtered_peak_indices / 500 # Convert indices to seconds
-		rr_intervals <- diff(filtered_peak_indices_s)
+			filtered_peak_indices_s <- filtered_peak_indices / 500 # Convert indices to seconds
+			rr_intervals <- diff(filtered_peak_indices_s)
 
 		# Calculate the mean RR interval (could also set a predefined expected minimum RR interval)
-		mean_rr <- mean(rr_intervals)
+			mean_rr <- mean(rr_intervals)
 
 		# Instead of using standard deviation, define an explicit threshold for "short" RR intervals
 		# For instance, any RR interval less than 80% of the mean RR might be considered short
-		short_rr_threshold <- 0.8 * mean_rr
+			short_rr_threshold <- 0.8 * mean_rr
 
 		# Identify short RR intervals that are likely due to premature ectopic beats
-		short_rr_indices <- which(rr_intervals < short_rr_threshold)
+			short_rr_indices <- which(rr_intervals < short_rr_threshold)
 
 		# Flag the R-peaks leading to short RR intervals for exclusion
 		# Note: Adding 1 to the indices because diff() reduces the length by 1
-		ectopic_r_peaks <- filtered_peak_indices_s[short_rr_indices + 1]
+			ectopic_r_peaks <- filtered_peak_indices_s[short_rr_indices + 1]
 
 		# Remove the ectopic R-peaks from the original list of R-peaks
-		r_peaks_filtered <- filtered_peak_indices_s[!filtered_peak_indices_s %in% ectopic_r_peaks]
+			r_peaks_filtered <- filtered_peak_indices_s[!filtered_peak_indices_s %in% ectopic_r_peaks]
 
 		# Creates an ordered list of R wave timings and calculates RR intervals and converts them to ms
-		RR_times <- peaks_s
-		RR_order <- RR_times[order(RR_times)]
-		RR_times_plus1 <- RR_order[2:length(RR_order)]
-		RR_order_trim <- head(RR_order,-1)
-		RR_int <- RR_times_plus1 - RR_order_trim
-		RR_ms <- RR_int * 1000
+			RR_times <- peaks_s
+			RR_order <- RR_times[order(RR_times)]
+			RR_times_plus1 <- RR_order[2:length(RR_order)]
+			RR_order_trim <- head(RR_order,-1)
+			RR_int <- RR_times_plus1 - RR_order_trim
+			RR_ms <- RR_int * 1000
 
 		# Starting to calculate the RMSSD - calculates differences between RR intervals, squares and averages them
-		RR_ms_offset1 <- RR_ms[2:length(RR_ms)]
-		RR_ms_trim <- head(RR_ms,-1)
-		RR_diff <- RR_ms_offset1 - RR_ms_trim
+			RR_ms_offset1 <- RR_ms[2:length(RR_ms)]
+			RR_ms_trim <- head(RR_ms,-1)
+			RR_diff <- RR_ms_offset1 - RR_ms_trim
 
-		RR_diff_squ <- RR_diff^2
-		RR_diff_squ_avg <- mean(RR_diff_squ)
-		RMSSD <- sqrt(RR_diff_squ_avg)
-		RMSSD
+			RR_diff_squ <- RR_diff^2
+			RR_diff_squ_avg <- mean(RR_diff_squ)
+			RMSSD <- sqrt(RR_diff_squ_avg)
+			RMSSD
 
 		# Calculate the signal-to-noise ratio
 
 		# Calculate signal power
-		signal_power <- mean(signal[r_peaks_filtered]^2)
-		
-		signal_power_int <- mean(integrated_signal[r_peaks_filtered]^2)
+			signal_power <- mean(signal[r_peaks_filtered]^2)
+			
+			signal_power_int <- mean(integrated_signal[r_peaks_filtered]^2)
 
 		#Calculate noise power based on specific noise peaks 
-		noise_indices <- setdiff(1:length(signal), r_peaks_filtered)  # All indices excluding R-peaks
-		noise_power <- mean(signal[noise_indices]^2)
+			noise_indices <- setdiff(1:length(signal), r_peaks_filtered)  # All indices excluding R-peaks
+			noise_power <- mean(signal[noise_indices]^2)
 
-		noise_indices_int <- setdiff(1:length(integrated_signal), r_peaks_filtered)
-		noise_power_int <- mean(integrated_signal[noise_indices_int]^2)
+			noise_indices_int <- setdiff(1:length(integrated_signal), r_peaks_filtered)
+			noise_power_int <- mean(integrated_signal[noise_indices_int]^2)
 
 		# Compute SNR in decibels (dB)
-		snr_db <- 10 * log10(signal_power / noise_power)
-		snr_db_int <- 10 * log10(signal_power_int / noise_power_int)
+			snr_db <- 10 * log10(signal_power / noise_power)
+			snr_db_int <- 10 * log10(signal_power_int / noise_power_int)
 
 		# Print SNR
-		print(paste("SNR:", snr_db, "dB"))
-		print(paste("Integrated SNR:", snr_db_int, "dB"))
+			print(paste("SNR:", snr_db, "dB"))
+			print(paste("Integrated SNR:", snr_db_int, "dB"))
 
 		# Add a row to the results dataframe
 		results_df <- rbind(results_df, data.frame(filepath = filepath,
@@ -192,7 +192,7 @@ for (i in directories[1]){ #it's a bit slow, the 1 here and on line 14 are for t
 	}
 
 # Print the results dataframe
-results_df
+	results_df
 
 # Plots peaks against ECG signal
 
