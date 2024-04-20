@@ -15,9 +15,13 @@ library("dplyr")
     merged_df <- inner_join(GRS$grs, hrv_df, by = "eid")
 
 # Create a new dataframe with rows that have mean_rr values between 600 and 1200 ms (HR 50-100) 
-# to exclude non-physiological HRs
+# to exclude non-physiological HRs and outliers caused by poor signal quality
     HR_clip_df <- merged_df %>% filter(mean_rr >= 0.6 & mean_rr <= 1.2)
-
+    
+# Filter to include only rows with SNR values between -10 and 10 dB to ensure reasonable signal quality
+    #HR_clip_df <- HR_clip_df %>% filter(abs(snr_db_int) >= 10) 
+    # Commented out for now to include all data - seems not to be necessary
+    
 # Save the merged dataframe to a CSV file and upload to DNAnexus
     write.csv(HR_clip_df, "HR_clip_df.csv", row.names = TRUE)
     system('dx upload HR_clip_df.csv --path /Alexander/')
