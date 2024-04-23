@@ -25,6 +25,7 @@ library("dplyr")
 # Reads GP data on BMI, DOB and age and joins with HRV data by eid
     a <- read_GP('22K..')
     df_hrv_bmi <- inner_join(a, HR_clip_df, by = "eid")         ## Need to clean BMI data as in two different columns
+    df_hrv_bmi$event_age <- abs(df_hrv_bmi$event_age)
 
 # Generate a frequency histogram for age using ggplot2
     library(ggplot2)
@@ -102,3 +103,21 @@ library("dplyr")
                 r_squared <- 1 - (sse / sst)
 
             print(r_squared)
+
+# Association with sudden (cardiac) or unexplained death
+    ICD10_codes=c('I46', 'I46.0', 'I46.1', 'I46.9', 'R96', 'R96.0', 'R96.1', 'R98', 'R99')
+    ICD10_records=read_ICD10(ICD10_codes)
+
+    df_ICD10 <- left_join(df_hrv_bmi, ICD10_records, by = "eid")
+
+    library(dplyr)
+
+    df_ICD10 <- df_ICD10 %>%
+    mutate(binary = ifelse(!is.na(diag_icd10), 1, 0))
+
+    model <- glm('binary~RMSSD',data=df_ICD10,family='binomial')
+    summary(model)
+
+    F <- anova(model, test = "F")
+    summary(F)
+
