@@ -12,7 +12,7 @@ library("dplyr")
     hrv_df <- read.csv("hrv_11_04_24.csv")
 
 # Perform inner join to merge the GRS and hrv_df dataframes based on matching eid
-    merged_df <- inner_join(GRS$grs, hrv_df, by = "eid")
+    L_merged_df <- left_join(hrv_df, GRS$grs, by = "eid")
 
 # Create a new dataframe with rows that have mean_rr values between 600 and 1200 ms (HR 50-100) 
 # to exclude non-physiological HRs and outliers caused by poor signal quality
@@ -24,8 +24,9 @@ library("dplyr")
 
 # Reads GP data on BMI, DOB and age and joins with HRV data by eid
     a <- read_GP('22K..')
-    df_hrv_bmi <- inner_join(a, HR_clip_df, by = "eid")         ## Need to clean BMI data as in two different columns
+    df_hrv_bmi <- inner_join(a, HR_clip_df, by = "eid")
     df_hrv_bmi$event_age <- abs(df_hrv_bmi$event_age)
+
 
 # Generate a frequency histogram for age using ggplot2
     library(ggplot2)
