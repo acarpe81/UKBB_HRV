@@ -16,7 +16,7 @@ library("dplyr")
 
 # Create a new dataframe with rows that have mean_rr values between 600 and 1200 ms (HR 50-100) 
 # to exclude non-physiological HRs and outliers caused by poor signal quality
-    HR_clip_df <- merged_df %>% filter(mean_rr >= 0.6 & mean_rr <= 1.2)
+    HR_clip_df <- L_merged_df %>% filter(mean_rr >= 0.6 & mean_rr <= 1.2)
 
 # Load the UKBB health records library
     library(devtools) 
@@ -24,6 +24,7 @@ library("dplyr")
 
 # Reads GP data on BMI, DOB and age and joins with HRV data by eid
     a <- read_GP('22K..')
+    a <- distinct(a, eid, .keep_all = TRUE)
     df_hrv_bmi <- inner_join(a, HR_clip_df, by = "eid")
     df_hrv_bmi$event_age <- abs(df_hrv_bmi$event_age)
 
