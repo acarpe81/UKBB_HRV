@@ -38,6 +38,11 @@ library("dplyr")
     # Calculate R-squared value
     r_squared <- summary(model)$r.squared
     r_squared
+
+        F <- anova(model, test = "F")
+    summary(F)
+
+
     # Quantify the correlation between RMSSD and has_death
     correlation <- cor(df_hrv_death$RMSSD, df_hrv_death$has_death, use = "complete.obs")
     correlation
@@ -48,4 +53,5 @@ library("dplyr")
 # Regression analysis between GRS and death
     model <- glm('has_death ~ grs',data=df_hrv_death,family='binomial')
     summary(model)
+
 
