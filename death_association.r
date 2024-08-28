@@ -42,6 +42,9 @@ library("dplyr")
         F <- anova(model, test = "F")
     summary(F)
 
+# RMSSD correction for mean HR (RR interval) possible with the following code:
+    df_hrv_death$RMSSD_normalised <- df_hrv_death$RMSSD / df_hrv_death$mean_rr
+
 
     # Quantify the correlation between RMSSD and has_death
     correlation <- cor(df_hrv_death$RMSSD, df_hrv_death$has_death, use = "complete.obs")
